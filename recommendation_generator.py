@@ -2,18 +2,21 @@ import sqlite3
 import pandas as pd
 from datetime import datetime
 
-DATABASE_PATH = "C:/Users/thisr/source/repos/CISTAC2/CistacApp/CistacApp.db"
+# Insert DB path here
+# DATABASE_PATH = "path/to/your/database.db"
+DATABASE_PATH = ""
 
 conn = sqlite3.connect(DATABASE_PATH)
 cursor = conn.cursor()
 
-# Reviews tablosundan verileri al
+# Fetch reviews from the database
+# Assuming the Reviews table has columns: UserID, RoomID, Rating
 df = pd.read_sql_query("SELECT UserID, RoomID, Rating FROM Reviews", conn)
 
 # Pivot: user x room matrix
 ratings_matrix = df.pivot_table(index="UserID", columns="RoomID", values="Rating")
 
-# Kullanıcı benzerliklerini hesapla (Pearson)
+# Calculate similarity rating patterns with (Pearson correlation)
 user_similarity = ratings_matrix.T.corr()
 
 def recommend_rooms(user_id, top_n=10):
@@ -38,14 +41,14 @@ def recommend_rooms(user_id, top_n=10):
 
     return sorted(predicted_scores.items(), key=lambda x: x[1], reverse=True)[:top_n]
 
-# Mevcut önerileri temizle
+# Clear existing recommendations
 cursor.execute("DELETE FROM Recommendations")
 
-# Her kullanıcı için önerileri hesapla ve Recommendations tablosuna yaz
+# Generate recommendations for each user
 for user_id in df['UserID'].unique():
     recommendations = recommend_rooms(user_id, top_n=10)
     for room_id, score in recommendations:
-        if score >= 4.0:  # Sadece 4.0 ve üstü önerileri kaydet
+        if score >= 4.0:  # Only insert recommendations with a score of 4.0 or higher
             cursor.execute(
                 "INSERT INTO Recommendations (user_id, recommended_room_id, predicted_score, Created_At) VALUES (?, ?, ?, ?)",
                 (int(user_id), int(room_id), float(score), datetime.now().isoformat())
